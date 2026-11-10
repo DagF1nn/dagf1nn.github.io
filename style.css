@@ -1,0 +1,15 @@
+:root { --bg: #f6efe3; --kort: #ffffff; --ink: #2b2a33; --dempet: #55526a; --aksent: #c8402f; --kant: #2b2a33; }
+@media (prefers-color-scheme: dark) { :root { --bg: #1d1c24; --kort: #2b2a33; --ink: #f6efe3; --dempet: #b9b5c9; --aksent: #f08a3c; --kant: #f6efe3; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 18px/1.6 Consolas, "Courier New", monospace; }
+main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 34px; margin: 28px 0 8px; }
+h2 { font-size: 22px; margin: 32px 0 8px; }
+a { color: var(--aksent); text-underline-offset: 3px; }
+a:focus-visible { outline: 3px solid var(--aksent); outline-offset: 3px; }
+nav { display: flex; flex-wrap: wrap; gap: 8px 20px; padding: 12px 0; border-bottom: 3px solid var(--kant); }
+nav a { min-height: 44px; display: inline-flex; align-items: center; font-weight: 700; }
+.kort { background: var(--kort); border: 3px solid var(--kant); border-radius: 20px; padding: 16px 20px; margin: 16px 0; box-shadow: 0 6px 0 rgba(43,42,51,0.18); }
+.kort h3 { margin: 0 0 4px; font-size: 20px; }
+.dempet { color: var(--dempet); font-size: 15px; }
+footer { margin-top: 48px; color: var(--dempet); font-size: 15px; }
