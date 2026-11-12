@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TikTok sign-in · Dagfinn Productions</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <nav aria-label="Main"><a href="index.html">Home</a><a href="tiktok.html">Publish to TikTok</a><a href="privacy.html">Privacy policy</a></nav>
+  <h1>TikTok sign-in</h1>
+  <p id="melding" role="status">Checking…</p>
+  <p class="dempet">This page stores nothing and sends nothing anywhere. The sign-in code is shown here only so you can hand it to your own publishing tool.</p>
+</main>
+<script>
+const p = new URLSearchParams(location.search), m = document.getElementById("melding");
+let lagret = null;
+try { lagret = sessionStorage.getItem("tt_state"); sessionStorage.removeItem("tt_state"); } catch (_) {}
+history.replaceState(null, "", location.pathname);  // koden blir ikke stående i adressefeltet
+if (p.get("error")) m.textContent = "Sign-in was not completed: " + (p.get("error_description") || p.get("error"));
+else if (!p.get("code") || !lagret || p.get("state") !== lagret) m.textContent = "Sign-in could not be verified (missing or mismatched state). Please start again from the Publish to TikTok page.";
+else {
+  m.textContent = "Signed in. Sign-in received for scopes: " + (p.get("scopes") || "") + ". Paste this code into your publishing tool, then return to the Publish to TikTok page.";
+  const c = document.createElement("textarea"); c.readOnly = true; c.value = p.get("code"); c.setAttribute("aria-label", "Sign-in code");
+  c.style.cssText = "width:100%;min-height:80px;font:inherit"; m.after(c);
+}
+</script>
+</body>
+</html>

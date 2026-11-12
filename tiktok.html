@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Publish to TikTok · Dagfinn Productions</title>
+<meta name="description" content="A small publishing tool for creators: sign in with TikTok, choose how a video is shared, and publish it.">
+<link rel="stylesheet" href="style.css">
+<style>
+  label { display: block; margin: 12px 0 4px; font-weight: 700; }
+  input[type=text], select, textarea { width: 100%; font: inherit; padding: 10px; min-height: 44px; border: 3px solid var(--kant); border-radius: 12px; background: var(--kort); color: var(--ink); }
+  .rad { display: flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 400; margin: 0; }
+  .rad input { width: 24px; height: 24px; }
+  button, .knapp { font: inherit; font-weight: 700; min-height: 48px; padding: 8px 20px; border: 3px solid var(--kant); border-radius: 14px; background: var(--aksent); color: #fff; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid var(--aksent); outline-offset: 3px; }
+  .feil { color: #b3261e; font-weight: 700; }
+  @media (prefers-color-scheme: dark) { .feil { color: #ff9e94; } button, .knapp { color: #1d1c24; } }
+  video { width: 100%; max-height: 360px; border-radius: 12px; background: #000; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <nav aria-label="Main">
+    <a href="index.html">Home</a>
+    <a href="privacy.html">Privacy policy</a>
+    <a href="terms.html">Terms</a>
+  </nav>
+  <h1>Publish to TikTok</h1>
+  <p>A small tool for creators and publishers. Sign in with TikTok, choose how your video is shared, and publish it to your own account. Nothing is posted until you choose a visibility and confirm.</p>
+
+  <div class="kort">
+    <h2>1. Sign in</h2>
+    <p>The tool asks for two permissions: <strong>user.info.basic</strong> (to show which account you are posting to) and <strong>video.publish</strong> (to publish the video you choose to that account).</p>
+    <a class="knapp" id="login" href="#">Log in with TikTok</a>
+    <p class="dempet" id="inn"></p>
+  </div>
+
+  <form class="kort" id="skjema" novalidate>
+    <h2>2. Choose how to share</h2>
+    <p id="konto" class="dempet" role="status">Not signed in. Sign in first so the account and its options can be loaded.</p>
+
+    <label for="video">Video</label>
+    <input type="file" id="video" accept="video/mp4,video/quicktime,video/webm">
+    <video id="forh" controls playsinline hidden></video>
+
+    <label for="tittel">Title</label>
+    <input type="text" id="tittel" maxlength="2200" autocomplete="off">
+
+    <label for="synlig">Who can view this video</label>
+    <select id="synlig" required><option value="" selected disabled>Select…</option></select>
+
+    <fieldset style="border:0;padding:0;margin:12px 0 0">
+      <legend style="font-weight:700">Allow users to</legend>
+      <label class="rad"><input type="checkbox" id="kommentar"> Comment</label>
+      <label class="rad"><input type="checkbox" id="duett"> Duet</label>
+      <label class="rad"><input type="checkbox" id="stitch"> Stitch</label>
+    </fieldset>
+
+    <label class="rad" style="margin-top:12px"><input type="checkbox" id="kom"> Content Disclosure Setting (this video promotes a brand, product or service)</label>
+    <div id="komvalg" hidden style="margin-left:34px">
+      <label class="rad"><input type="checkbox" id="egen"> Your brand</label>
+      <label class="rad"><input type="checkbox" id="tredje"> Branded content</label>
+      <p class="dempet" id="komtekst"></p>
+    </div>
+
+    <p class="dempet" id="samtykke">By posting, you agree to TikTok's <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en">Music Usage Confirmation</a>.</p>
+    <p class="feil" id="feil" role="alert"></p>
+    <button type="submit" id="post" disabled>Post</button>
+    <p class="dempet">After you press Post the video is uploaded to TikTok. Processing can take a few minutes before the video appears on your profile.</p>
+    <pre id="svar" class="dempet" hidden></pre>
+  </form>
+</main>
+<script>
+// Offentlig verdi (ikke hemmelig). Client secret finnes aldri på denne siden.
+const CLIENT_KEY = "awiy0e2htb99hjkj";
+const REDIRECT = "https://dagf1nn.github.io/tiktok-callback.html";
+const $ = (id) => document.getElementById(id);
+const NAVN = { PUBLIC_TO_EVERYONE: "Everyone", MUTUAL_FOLLOW_FRIENDS: "Friends", FOLLOWER_OF_CREATOR: "Followers", SELF_ONLY: "Only me" };
+
+// Innlogging (Login Kit, web). state mot CSRF.
+$("login").addEventListener("click", (e) => {
+  e.preventDefault();
+  const a = new Uint8Array(16); crypto.getRandomValues(a);
+  const state = Array.from(a, (b) => b.toString(16).padStart(2, "0")).join("");
+  try { sessionStorage.setItem("tt_state", state); } catch (_) {}
+  location.href = "https://www.tiktok.com/v2/auth/authorize/?" + new URLSearchParams({
+    client_key: CLIENT_KEY, response_type: "code", scope: "user.info.basic,video.publish", redirect_uri: REDIRECT, state });
+});
+
+// Kontoinfo kommer fra creator.json, skrevet av det lokale skriptet etter innlogging (creator_info/query). Ingen token her.
+let kreator = null, vedlegg = null;
+fetch("creator.json", { cache: "no-store" }).then((r) => r.ok ? r.json() : null).then((k) => {
+  if (!k || !Array.isArray(k.privacy_level_options)) return;
+  kreator = k;
+  $("konto").textContent = "Posting to: " + k.creator_nickname + " (@" + k.creator_username + ")";
+  for (const o of k.privacy_level_options) $("synlig").add(new Option(NAVN[o] || o, o));
+  for (const [id, av] of [["kommentar", k.comment_disabled], ["duett", k.duet_disabled], ["stitch", k.stitch_disabled]]) {
+    if (av) { $(id).disabled = true; $(id).parentElement.title = "Turned off in your TikTok settings"; }
+  }
+  sjekk();
+}).catch(() => {});
+
+$("video").addEventListener("change", (e) => {
+  const f = e.target.files[0]; vedlegg = f || null;
+  if (f) { $("forh").src = URL.createObjectURL(f); $("forh").hidden = false; if (!$("tittel").value) $("tittel").value = f.name.replace(/\.[^.]+$/, ""); }
+  sjekk();
+});
+$("kom").addEventListener("change", () => { $("komvalg").hidden = !$("kom").checked; sjekk(); });
+for (const id of ["synlig", "tittel", "egen", "tredje"]) $(id).addEventListener("input", sjekk);
+
+function sjekk() {
+  const synlig = $("synlig").value, kom = $("kom").checked, egen = $("egen").checked, tredje = $("tredje").checked;
+  let feil = "";
+  const private_ = synlig === "SELF_ONLY";
+  $("tredje").disabled = private_;
+  if (private_ && tredje) $("tredje").checked = false;
+  $("tredje").parentElement.title = private_ ? "Branded content visibility cannot be set to private." : "";
+  if (kom && !egen && !tredje) feil = "You need to indicate if your content promotes yourself, a third party, or both.";
+  const bc = $("tredje").checked;
+  $("komtekst").textContent = !kom ? "" : bc ? "Your video will be labeled as 'Paid partnership'" : egen ? "Your video will be labeled as 'Promotional content'" : "";
+  $("samtykke").innerHTML = bc
+    ? "By posting, you agree to TikTok's <a href=\"https://www.tiktok.com/legal/page/global/bc-policy/en\">Branded Content Policy</a> and <a href=\"https://www.tiktok.com/legal/page/global/music-usage-confirmation/en\">Music Usage Confirmation</a>."
+    : "By posting, you agree to TikTok's <a href=\"https://www.tiktok.com/legal/page/global/music-usage-confirmation/en\">Music Usage Confirmation</a>.";
+  $("feil").textContent = feil;
+  $("post").disabled = !(kreator && vedlegg && synlig && !feil);
+}
+
+// Post: siden har ingen token. Valgene lagres som en fil som det lokale skriptet leser og poster med.
+$("skjema").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if ($("post").disabled) return;
+  const valg = { privacy: $("synlig").value, title: $("tittel").value, disable_comment: !$("kommentar").checked, disable_duet: !$("duett").checked,
+                 disable_stitch: !$("stitch").checked, brand_organic: $("kom").checked && $("egen").checked, brand_content: $("kom").checked && $("tredje").checked };
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({ tiktok: valg, video: vedlegg.name }, null, 2)], { type: "application/json" }));
+  a.download = "tiktok-choice.json"; a.click();
+  $("svar").hidden = false;
+  $("svar").textContent = "Choices saved. Run the publishing tool to upload \"" + vedlegg.name + "\" to " + kreator.creator_nickname + ".";
+});
+sjekk();
+</script>
+</body>
+</html>
